@@ -6,12 +6,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import javax.annotation.Nullable;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockRedstoneComparator;
-import net.minecraft.block.BlockRedstoneRepeater;
-import net.minecraft.block.BlockSlab;
-import net.minecraft.block.BlockStairs;
-import net.minecraft.block.BlockTrapDoor;
+
+import net.minecraft.block.*;
 import net.minecraft.block.properties.IProperty;
 import net.minecraft.block.properties.PropertyDirection;
 import net.minecraft.block.state.IBlockState;
@@ -372,9 +368,17 @@ public class EasyPlaceUtils
 
     private static EnumActionResult handleEasyPlace(Minecraft mc)
     {
-        double reach = Math.max(6, mc.playerController.getBlockReachDistance());
         Entity entity = fi.dy.masa.malilib.util.EntityUtils.getCameraEntity();
-        RayTraceWrapper traceWrapper = RayTraceUtils.getGenericTrace(mc.world, entity, RayTraceFluidHandling.ANY, reach, true, false);
+        double reach = Math.max(6, mc.playerController.getBlockReachDistance());
+        RayTraceWrapper traceWrapper;
+
+        if (Configs.Generic.EASY_PLACE_DEEP_ENABLED.getBooleanValue()) {
+            traceWrapper = RayTraceUtils.getFurthestTrace(mc.world, entity, reach, false);
+        }
+        else {
+            traceWrapper = RayTraceUtils.getGenericTrace(mc.world, entity, RayTraceFluidHandling.ANY, reach, true, false);
+        }
+
         HitPosition targetPosition = getTargetPosition(traceWrapper, mc);
 
         // No position override, and didn't ray trace to a schematic block
@@ -385,7 +389,7 @@ public class EasyPlaceUtils
                 return placementRestrictionInEffect(mc) ? EnumActionResult.FAIL : EnumActionResult.PASS;
             }
 
-            return EnumActionResult.PASS;
+            return EnumActionResult.FAIL;
         }
 
         final BlockPos targetBlockPos = targetPosition.getBlockPos();
@@ -501,6 +505,13 @@ public class EasyPlaceUtils
             }
 
             return true;
+        }
+
+        // bodge to haandle double plants, should be added to malilib
+        boolean isDoublePlant = stateClient.getBlock() instanceof BlockDoublePlant;
+
+        if (isDoublePlant) {
+            return PlacementUtils.isReplaceable(worldClient, targetPos, false);
         }
 
         return PlacementUtils.isReplaceable(worldClient, targetPos, true);

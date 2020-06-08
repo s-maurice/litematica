@@ -37,6 +37,7 @@ public class Configs implements IConfigHandler
         public static final ConfigBoolean       EASY_PLACE_CLICK_ADJACENT = new ConfigBoolean(  "easyPlaceClickAdjacent", false, "If enabled, then the Easy Place mode will try to\nclick on existing adjacent blocks. This may help on Spigot\nor similar servers, which don't allow clicking on air blocks.");
         public static final ConfigBoolean       EASY_PLACE_MODE         = new ConfigBoolean(    "easyPlaceMode", false, "When enabled, then simply trying to use an item/place a block\non schematic blocks will place that block in that position");
         public static final ConfigBoolean       EASY_PLACE_HOLD_ENABLED = new ConfigBoolean(    "easyPlaceHoldEnabled", false, "When enabled, then simply holding down the use key\nand looking at different schematic blocks will place them");
+        public static final ConfigBoolean       EASY_PLACE_DEEP_ENABLED = new ConfigBoolean(    "easyPlaceDeepEnabled", false, "When enabled, the Easy Place Mode will attempt to place further away blocks first.");
         public static final ConfigBoolean       EXECUTE_REQUIRE_TOOL    = new ConfigBoolean(    "executeRequireHoldingTool", true, "Require holding an enabled tool item\nfor the executeOperation hotkey to work");
         public static final ConfigBoolean       FIX_RAIL_ROTATION       = new ConfigBoolean(    "fixRailRotation", true, "If true, then a fix is applied for the vanilla bug in rails,\nwhere the 180 degree rotations of straight north-south and\neast-west rails rotate 90 degrees counterclockwise instead >_>");
         public static final ConfigBoolean       GENERATE_LOWERCASE_NAMES = new ConfigBoolean(   "generateLowercaseNames", true, "If enabled, then by default the suggested schematic names\nwill be lowercase and using underscores instead of spaces");
@@ -69,6 +70,7 @@ public class Configs implements IConfigHandler
                 EASY_PLACE_CLICK_ADJACENT,
                 EASY_PLACE_MODE,
                 EASY_PLACE_HOLD_ENABLED,
+                EASY_PLACE_DEEP_ENABLED,
                 EXECUTE_REQUIRE_TOOL,
                 FIX_RAIL_ROTATION,
                 GENERATE_LOWERCASE_NAMES,

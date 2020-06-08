@@ -86,6 +86,7 @@ public class HotkeyCallbacks
         Hotkeys.TOGGLE_TRANSLUCENT_RENDERING.getKeybind().setCallback(new RenderToggle(Configs.Visuals.RENDER_BLOCKS_AS_TRANSLUCENT));
 
         Hotkeys.EASY_PLACE_TOGGLE.getKeybind().setCallback(new KeyCallbackToggleBooleanConfigWithMessage(Configs.Generic.EASY_PLACE_MODE));
+        Hotkeys.EASY_PLACE_DEEP_TOGGLE.getKeybind().setCallback(new KeyCallbackToggleBooleanConfigWithMessage(Configs.Generic.EASY_PLACE_DEEP_ENABLED));
         Hotkeys.TOGGLE_AREA_SELECTION_RENDERING.getKeybind().setCallback(new KeyCallbackToggleBooleanConfigWithMessage(Configs.Visuals.ENABLE_AREA_SELECTION_RENDERING));
         Hotkeys.TOGGLE_INFO_OVERLAY_RENDERING.getKeybind().setCallback(new KeyCallbackToggleBooleanConfigWithMessage(Configs.InfoOverlays.BLOCK_INFO_OVERLAY_ENABLED));
         Hotkeys.PICK_BLOCK_TOGGLE.getKeybind().setCallback(new KeyCallbackToggleBooleanConfigWithMessage(Configs.Generic.PICK_BLOCK_ENABLED));
