@@ -373,9 +373,7 @@ public class EasyPlaceUtils
 
     private static EnumActionResult handleEasyPlace(Minecraft mc)
     {
-        if (Configs.Generic.EASY_PLACE_DEEP_ENABLED.getBooleanValue()) {
-            return handleDeepEasyPlace(mc);
-        }
+        if (Configs.Generic.EASY_PLACE_DEEP_ENABLED.getBooleanValue()) { return handleDeepEasyPlace(mc); }
 
         double reach = Math.max(6, mc.playerController.getBlockReachDistance());
         Entity entity = fi.dy.masa.malilib.util.EntityUtils.getCameraEntity();
@@ -402,28 +400,22 @@ public class EasyPlaceUtils
 
         double reach = Math.max(6, mc.playerController.getBlockReachDistance());
         Entity entity = fi.dy.masa.malilib.util.EntityUtils.getCameraEntity();
+
         Vec3d eyesPos = entity.getPositionEyes(1f);
         Vec3d rangedLookRot = entity.getLook(1f).scale(reach);
         Vec3d lookEndPos = eyesPos.add(rangedLookRot);
 
-        // get vanilla furthest
         RayTraceResult traceVanilla = fi.dy.masa.malilib.util.RayTraceUtils.getRayTraceFromEntity(mc.world, entity, RayTraceFluidHandling.NONE, false, reach);
-        double closestVanilla;
-        if (traceVanilla.typeOfHit == RayTraceResult.Type.MISS) {
-            closestVanilla = reach;
-        }
-        else {
-            closestVanilla = traceVanilla.hitVec.squareDistanceTo(eyesPos);
-        }
+        double closestVanilla = traceVanilla.typeOfHit == RayTraceResult.Type.MISS ? reach : traceVanilla.hitVec.squareDistanceTo(eyesPos);
 
-        World schematicWorld = SchematicWorldHandler.getSchematicWorld();
         // tbh rayTraceSchematicWorldBlocksToList should be renamed or not take world arg
+        World schematicWorld = SchematicWorldHandler.getSchematicWorld();
         List<RayTraceResult> list = RayTraceUtils.rayTraceSchematicWorldBlocksToList(schematicWorld, eyesPos, lookEndPos, 24);
 
         // get furthest schematic block, but not further than vanilla block, same as in getPickBlockLastTrace
         double furthestDist = -1D;
         RayTraceResult furthestTrace = null;
-        BlockPos closestVanillaPos = traceVanilla.getBlockPos();
+        BlockPos closestVanillaPos = traceVanilla.getBlockPos(); // small bug here, returns 0, 0, 0 for missed rays
         boolean vanillaPosReplaceable = mc.world.getBlockState(closestVanillaPos).getBlock().isReplaceable(mc.world, closestVanillaPos);
 
         if (!list.isEmpty()) {
@@ -446,27 +438,18 @@ public class EasyPlaceUtils
         }
 
         if (furthestTrace == null) {
-            return placementRestrictionInEffect(mc) ? EnumActionResult.FAIL : EnumActionResult.PASS;
-        }
-
-        HitPosition targetPosition = HitPosition.of(furthestTrace.getBlockPos(), furthestTrace.hitVec, furthestTrace.sideHit);
-
-        // Didn't trace to any schematic blocks, but hit a vanilla block.
-        if (targetPosition == null) {
-
-            BlockPos targetBlockPos = closestVanillaPos.offset(traceVanilla.sideHit);
-            LayerRange layerRange = DataManager.getRenderLayerRange();
-
-            if (!(layerRange.isPositionWithinRange(targetBlockPos) &&
-                    schematicWorld.getBlockState(targetBlockPos).getMaterial() != Material.AIR &&
-                    mc.world.getBlockState(targetBlockPos).getMaterial() == Material.AIR)) {
-
-                // nothing to easyplace
-                return EnumActionResult.PASS;
+            if (traceVanilla.typeOfHit == RayTraceResult.Type.BLOCK) {
+                return placementRestrictionInEffect(mc) ? EnumActionResult.FAIL : EnumActionResult.PASS;
             }
+            return EnumActionResult.PASS;
         }
 
-        return doEasyPlacePlacement(mc, targetPosition);
+        // Create fake RayTraceWrapper so that getTargetPosition can be used / check placement override
+        RayTraceWrapper rayTraceWrapper = new RayTraceWrapper(RayTraceWrapper.HitType.SCHEMATIC_BLOCK , furthestTrace);
+        HitPosition targetPosition = getTargetPosition(rayTraceWrapper, mc);
+//        HitPosition targetPosition = HitPosition.of(furthestTrace.getBlockPos(), furthestTrace.hitVec, furthestTrace.sideHit);
+
+        return targetPosition != null ? doEasyPlacePlacement(mc, targetPosition) : EnumActionResult.FAIL;
     }
 
     private static EnumActionResult doEasyPlacePlacement(Minecraft mc, final HitPosition targetPosition) {
