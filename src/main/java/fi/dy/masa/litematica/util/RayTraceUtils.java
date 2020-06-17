@@ -447,37 +447,6 @@ public class RayTraceUtils
     @Nullable
     public static BlockPos getPickBlockLastTrace(World worldClient, Entity entity, double maxRange, boolean adjacentOnly)
     {
-        RayTraceWrapper traceWrapper = getFurthestTrace(worldClient, entity, maxRange, adjacentOnly);
-
-        if (traceWrapper != null && traceWrapper.getRayTraceResult() != null) {
-            return traceWrapper.getRayTraceResult().getBlockPos();
-        }
-
-        // Didn't trace to any schematic blocks, but hit a vanilla block.
-        // Check if there is a schematic block adjacent to the vanilla block
-        // (which means that it has a non-full-cube collision box, since
-        // it wasn't hit by the trace), and no block in the client world.
-        // Note that this method is only used for the "pickBlockLast" type
-        // of pick blocking, not for the "first" variant, where this would
-        // probably be annoying if you want to pick block the client world block.
-        if (traceWrapper == null) {
-//            // retrace to get the vanilla trace
-            RayTraceResult traceVanilla = fi.dy.masa.malilib.util.RayTraceUtils.getRayTraceFromEntity(worldClient, entity, RayTraceFluidHandling.NONE, false, maxRange);
-
-            BlockPos pos = traceVanilla.getBlockPos().offset(traceVanilla.sideHit);
-            LayerRange layerRange = DataManager.getRenderLayerRange();
-
-            if (layerRange.isPositionWithinRange(pos) &&
-                    SchematicWorldHandler.getSchematicWorld().getBlockState(pos).getMaterial() != Material.AIR &&
-                    worldClient.getBlockState(pos).getMaterial() == Material.AIR)
-            {
-                return pos;
-            }
-        }
-        return null;
-    }
-
-    public static RayTraceWrapper getFurthestTrace(World worldClient, Entity entity, double maxRange, boolean adjacentOnly) {
         Vec3d eyesPos = entity.getPositionEyes(1f);
         Vec3d rangedLookRot = entity.getLook(1f).scale(maxRange);
         Vec3d lookEndPos = eyesPos.add(rangedLookRot);
@@ -509,8 +478,8 @@ public class RayTraceUtils
                 // in which case the distance to the block at index 0 is the same as the block at index 1, since
                 // the trace leaves the first block at the same point where it enters the second block.
                 if ((furthestDist < 0 || dist >= furthestDist) &&
-                        (closestVanilla < 0 || dist < closestVanilla || (pos.equals(closestVanillaPos) && vanillaPosReplaceable)) &&
-                        (vanillaPosReplaceable || pos.equals(closestVanillaPos) == false))
+                    (closestVanilla < 0 || dist < closestVanilla || (pos.equals(closestVanillaPos) && vanillaPosReplaceable)) &&
+                     (vanillaPosReplaceable || pos.equals(closestVanillaPos) == false))
                 {
                     furthestDist = dist;
                     furthestTrace = trace;
@@ -524,29 +493,45 @@ public class RayTraceUtils
         }
 
         // Didn't trace to any schematic blocks, but hit a vanilla block.
-        // Return null and retrace in getSchematicWorldTraceIfClosest(),
-        // because can't return RayTraceWrapper with null RayTraceResult
+        // Check if there is a schematic block adjacent to the vanilla block
+        // (which means that it has a non-full-cube collision box, since
+        // it wasn't hit by the trace), and no block in the client world.
+        // Note that this method is only used for the "pickBlockLast" type
+        // of pick blocking, not for the "first" variant, where this would
+        // probably be annoying if you want to pick block the client world block.
         if (furthestTrace == null)
         {
-            return null;
+            BlockPos pos = closestVanillaPos.offset(traceVanilla.sideHit);
+            LayerRange layerRange = DataManager.getRenderLayerRange();
+
+            if (layerRange.isPositionWithinRange(pos) &&
+                worldSchematic.getBlockState(pos).getMaterial() != Material.AIR &&
+                worldClient.getBlockState(pos).getMaterial() == Material.AIR)
+            {
+                return pos;
+            }
         }
 
         // Traced to schematic blocks, check that the furthest position
         // is next to a vanilla block, ie. in a position where it could be placed normally
-        BlockPos pos = furthestTrace.getBlockPos();
-
-        if (adjacentOnly)
+        if (furthestTrace != null)
         {
-            BlockPos placementPos = vanillaPosReplaceable ? closestVanillaPos : closestVanillaPos.offset(traceVanilla.sideHit);
+            BlockPos pos = furthestTrace.getBlockPos();
 
-            if (pos.equals(placementPos) == false)
+            if (adjacentOnly)
             {
-                return null;
+                BlockPos placementPos = vanillaPosReplaceable ? closestVanillaPos : closestVanillaPos.offset(traceVanilla.sideHit);
+
+                if (pos.equals(placementPos) == false)
+                {
+                    return null;
+                }
             }
+
+            return pos;
         }
 
-        return new RayTraceWrapper(HitType.SCHEMATIC_BLOCK, furthestTrace);
-
+        return null;
     }
 
     public static List<RayTraceResult> rayTraceSchematicWorldBlocksToList(World world, Vec3d start, Vec3d end, int maxSteps)

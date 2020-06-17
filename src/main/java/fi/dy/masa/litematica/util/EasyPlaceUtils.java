@@ -6,8 +6,13 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import javax.annotation.Nullable;
-
-import net.minecraft.block.*;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockRedstoneComparator;
+import net.minecraft.block.BlockRedstoneRepeater;
+import net.minecraft.block.BlockSlab;
+import net.minecraft.block.BlockStairs;
+import net.minecraft.block.BlockTrapDoor;
+import net.minecraft.block.material.Material;
 import net.minecraft.block.properties.IProperty;
 import net.minecraft.block.properties.PropertyDirection;
 import net.minecraft.block.state.IBlockState;
@@ -104,15 +109,15 @@ public class EasyPlaceUtils
     public static boolean shouldDoEasyPlaceActions()
     {
         return Configs.Generic.EASY_PLACE_MODE.getBooleanValue() && DataManager.getToolMode() != ToolMode.REBUILD &&
-               Hotkeys.EASY_PLACE_ACTIVATION.getKeybind().isKeybindHeld();
+                Hotkeys.EASY_PLACE_ACTIVATION.getKeybind().isKeybindHeld();
     }
 
     public static void easyPlaceOnUseTick(Minecraft mc)
     {
         if (mc.player != null && isHandling == false &&
-            shouldDoEasyPlaceActions() &&
-            Configs.Generic.EASY_PLACE_HOLD_ENABLED.getBooleanValue() &&
-            KeybindMulti.isKeyDown(mc.gameSettings.keyBindUseItem.getKeyCode()))
+                shouldDoEasyPlaceActions() &&
+                Configs.Generic.EASY_PLACE_HOLD_ENABLED.getBooleanValue() &&
+                KeybindMulti.isKeyDown(mc.gameSettings.keyBindUseItem.getKeyCode()))
         {
             isHandling = true;
             handleEasyPlace(mc);
@@ -204,7 +209,7 @@ public class EasyPlaceUtils
             // If there is a block in the world right behind the targeted schematic block, then use
             // that block as the click position
             if (PlacementUtils.isReplaceable(world, posVanilla, false) == false &&
-                targetPos.equals(posVanilla.offset(traceVanilla.sideHit)))
+                    targetPos.equals(posVanilla.offset(traceVanilla.sideHit)))
             {
                 return HitPosition.of(posVanilla, traceVanilla.hitVec, traceVanilla.sideHit);
             }
@@ -361,24 +366,20 @@ public class EasyPlaceUtils
         IBlockState stateSide = worldClient.getBlockState(posSide);
 
         return PlacementUtils.isReplaceable(worldClient, posSide, false) == false &&
-               (side.getAxis() != EnumFacing.Axis.Y ||
-                clientBlockIsSameMaterialSingleSlab(targetState, stateSide) == false
-                || stateSide.getValue(BlockSlab.HALF) != targetState.getValue(BlockSlab.HALF));
+                (side.getAxis() != EnumFacing.Axis.Y ||
+                        clientBlockIsSameMaterialSingleSlab(targetState, stateSide) == false
+                        || stateSide.getValue(BlockSlab.HALF) != targetState.getValue(BlockSlab.HALF));
     }
 
     private static EnumActionResult handleEasyPlace(Minecraft mc)
     {
-        Entity entity = fi.dy.masa.malilib.util.EntityUtils.getCameraEntity();
-        double reach = Math.max(6, mc.playerController.getBlockReachDistance());
-        RayTraceWrapper traceWrapper;
-
         if (Configs.Generic.EASY_PLACE_DEEP_ENABLED.getBooleanValue()) {
-            traceWrapper = RayTraceUtils.getFurthestTrace(mc.world, entity, reach, false);
-        }
-        else {
-            traceWrapper = RayTraceUtils.getGenericTrace(mc.world, entity, RayTraceFluidHandling.ANY, reach, true, false);
+            return handleDeepEasyPlace(mc);
         }
 
+        double reach = Math.max(6, mc.playerController.getBlockReachDistance());
+        Entity entity = fi.dy.masa.malilib.util.EntityUtils.getCameraEntity();
+        RayTraceWrapper traceWrapper = RayTraceUtils.getGenericTrace(mc.world, entity, RayTraceFluidHandling.ANY, reach, true, false);
         HitPosition targetPosition = getTargetPosition(traceWrapper, mc);
 
         // No position override, and didn't ray trace to a schematic block
@@ -389,8 +390,86 @@ public class EasyPlaceUtils
                 return placementRestrictionInEffect(mc) ? EnumActionResult.FAIL : EnumActionResult.PASS;
             }
 
-            return EnumActionResult.FAIL;
+            return EnumActionResult.PASS;
         }
+
+        return doEasyPlacePlacement(mc, targetPosition);
+    }
+
+    private static EnumActionResult handleDeepEasyPlace(Minecraft mc) {
+        // two possible deep easy place behaviours, one where it only tries the furthest block
+        // one where it tries the next closest block if the furthest fails
+
+        double reach = Math.max(6, mc.playerController.getBlockReachDistance());
+        Entity entity = fi.dy.masa.malilib.util.EntityUtils.getCameraEntity();
+        Vec3d eyesPos = entity.getPositionEyes(1f);
+        Vec3d rangedLookRot = entity.getLook(1f).scale(reach);
+        Vec3d lookEndPos = eyesPos.add(rangedLookRot);
+
+        // get vanilla furthest
+        RayTraceResult traceVanilla = fi.dy.masa.malilib.util.RayTraceUtils.getRayTraceFromEntity(mc.world, entity, RayTraceFluidHandling.NONE, false, reach);
+        double closestVanilla;
+        if (traceVanilla.typeOfHit == RayTraceResult.Type.MISS) {
+            closestVanilla = reach;
+        }
+        else {
+            closestVanilla = traceVanilla.hitVec.squareDistanceTo(eyesPos);
+        }
+
+        World schematicWorld = SchematicWorldHandler.getSchematicWorld();
+        // tbh rayTraceSchematicWorldBlocksToList should be renamed or not take world arg
+        List<RayTraceResult> list = RayTraceUtils.rayTraceSchematicWorldBlocksToList(schematicWorld, eyesPos, lookEndPos, 24);
+
+        // get furthest schematic block, but not further than vanilla block, same as in getPickBlockLastTrace
+        double furthestDist = -1D;
+        RayTraceResult furthestTrace = null;
+        BlockPos closestVanillaPos = traceVanilla.getBlockPos();
+        boolean vanillaPosReplaceable = mc.world.getBlockState(closestVanillaPos).getBlock().isReplaceable(mc.world, closestVanillaPos);
+
+        if (!list.isEmpty()) {
+            for (RayTraceResult trace : list) {
+                double dist = trace.hitVec.squareDistanceTo(eyesPos);
+                BlockPos pos = trace.getBlockPos();
+
+                if ((furthestDist < 0 || dist >= furthestDist) &&
+                        (dist < closestVanilla || (pos.equals(closestVanillaPos) && vanillaPosReplaceable)) &&
+                        (vanillaPosReplaceable || !pos.equals(closestVanillaPos))) {
+
+                    furthestDist = dist;
+                    furthestTrace = trace;
+
+                }
+                if (closestVanilla >= 0 && dist > closestVanilla) {
+                    break;
+                }
+            }
+        }
+
+        if (furthestTrace == null) {
+            return placementRestrictionInEffect(mc) ? EnumActionResult.FAIL : EnumActionResult.PASS;
+        }
+
+        HitPosition targetPosition = HitPosition.of(furthestTrace.getBlockPos(), furthestTrace.hitVec, furthestTrace.sideHit);
+
+        // Didn't trace to any schematic blocks, but hit a vanilla block.
+        if (targetPosition == null) {
+
+            BlockPos targetBlockPos = closestVanillaPos.offset(traceVanilla.sideHit);
+            LayerRange layerRange = DataManager.getRenderLayerRange();
+
+            if (!(layerRange.isPositionWithinRange(targetBlockPos) &&
+                    schematicWorld.getBlockState(targetBlockPos).getMaterial() != Material.AIR &&
+                    mc.world.getBlockState(targetBlockPos).getMaterial() == Material.AIR)) {
+
+                // nothing to easyplace
+                return EnumActionResult.PASS;
+            }
+        }
+
+        return doEasyPlacePlacement(mc, targetPosition);
+    }
+
+    private static EnumActionResult doEasyPlacePlacement(Minecraft mc, final HitPosition targetPosition) {
 
         final BlockPos targetBlockPos = targetPosition.getBlockPos();
         World schematicWorld = SchematicWorldHandler.getSchematicWorld();
@@ -400,8 +479,8 @@ public class EasyPlaceUtils
 
         // The block is correct already, or it was recently placed, or some of the checks failed
         if (stateSchematic == stateClient || requiredStack.isEmpty() ||
-            easyPlaceIsPositionCached(targetBlockPos) ||
-            canPlaceBlock(targetBlockPos, mc.world, stateSchematic, stateClient) == false)
+                easyPlaceIsPositionCached(targetBlockPos) ||
+                canPlaceBlock(targetBlockPos, mc.world, stateSchematic, stateClient) == false)
         {
             return EnumActionResult.FAIL;
         }
@@ -427,7 +506,7 @@ public class EasyPlaceUtils
 
             // Fluid _blocks_ are not replaceable... >_>
             if (stateClient.getBlock().isReplaceable(mc.world, targetBlockPos) == false &&
-                stateClient.getMaterial().isLiquid())
+                    stateClient.getMaterial().isLiquid())
             {
                 clickPos = clickPos.offset(side, -1);
             }
@@ -479,8 +558,8 @@ public class EasyPlaceUtils
         Block blockClient = stateClient.getBlock();
 
         if ((blockSchematic instanceof BlockSlab) &&
-            (blockClient instanceof BlockSlab) &&
-            ((BlockSlab) blockClient).isDouble() == false)
+                (blockClient instanceof BlockSlab) &&
+                ((BlockSlab) blockClient).isDouble() == false)
         {
             IProperty<?> propSchematic = ((BlockSlab) blockSchematic).getVariantProperty();
             IProperty<?> propClient = ((BlockSlab) blockClient).getVariantProperty();
@@ -498,20 +577,13 @@ public class EasyPlaceUtils
         if (isSlab)
         {
             if (PlacementUtils.isReplaceable(worldClient, targetPos, true) == false &&
-                (((BlockSlab) stateSchematic.getBlock()).isDouble() == false
-                || clientBlockIsSameMaterialSingleSlab(stateSchematic, stateClient) == false))
+                    (((BlockSlab) stateSchematic.getBlock()).isDouble() == false
+                            || clientBlockIsSameMaterialSingleSlab(stateSchematic, stateClient) == false))
             {
                 return false;
             }
 
             return true;
-        }
-
-        // bodge to haandle double plants, should be added to malilib
-        boolean isDoublePlant = stateClient.getBlock() instanceof BlockDoublePlant;
-
-        if (isDoublePlant) {
-            return PlacementUtils.isReplaceable(worldClient, targetPos, false);
         }
 
         return PlacementUtils.isReplaceable(worldClient, targetPos, true);
@@ -621,7 +693,7 @@ public class EasyPlaceUtils
 
             // Placement position is already occupied
             if (stateClient.getBlock().isReplaceable(mc.world, pos) == false &&
-                stateClient.getMaterial().isLiquid() == false)
+                    stateClient.getMaterial().isLiquid() == false)
             {
                 return true;
             }
@@ -674,8 +746,8 @@ public class EasyPlaceUtils
                         IntBoundingBox box = boxes.get(i);
 
                         if (x >= box.minX - range && x <= box.maxX + range &&
-                            y >= box.minY - range && y <= box.maxY + range &&
-                            z >= box.minZ - range && z <= box.maxZ + range)
+                                y >= box.minY - range && y <= box.maxY + range &&
+                                z >= box.minZ - range && z <= box.maxZ + range)
                         {
                             return true;
                         }
