@@ -406,7 +406,7 @@ public class EasyPlaceUtils
         Vec3d lookEndPos = eyesPos.add(rangedLookRot);
 
         RayTraceResult traceVanilla = fi.dy.masa.malilib.util.RayTraceUtils.getRayTraceFromEntity(mc.world, entity, RayTraceFluidHandling.NONE, false, reach);
-        double closestVanilla = traceVanilla.typeOfHit == RayTraceResult.Type.MISS ? reach : traceVanilla.hitVec.squareDistanceTo(eyesPos);
+        double closestVanilla = traceVanilla.typeOfHit == RayTraceResult.Type.MISS ? reach * reach : traceVanilla.hitVec.squareDistanceTo(eyesPos); // squared reach
 
         // tbh rayTraceSchematicWorldBlocksToList should be renamed or not take world arg
         World schematicWorld = SchematicWorldHandler.getSchematicWorld();
@@ -426,6 +426,16 @@ public class EasyPlaceUtils
                 if ((furthestDist < 0 || dist >= furthestDist) &&
                         (dist < closestVanilla || (pos.equals(closestVanillaPos) && vanillaPosReplaceable)) &&
                         (vanillaPosReplaceable || !pos.equals(closestVanillaPos))) {
+
+                    // skip traces to blocks that can't be placed?
+//                    IBlockState stateSchematic = schematicWorld.getBlockState(trace.getBlockPos());
+//                    ItemStack requiredStack = MaterialCache.getInstance().getRequiredBuildItemForState(stateSchematic);
+//                    boolean ignoreNbt = Configs.Generic.PICK_BLOCK_IGNORE_NBT.getBooleanValue();
+//                    int slotWithItem = fi.dy.masa.malilib.util.InventoryUtils.findSlotWithItemToPickBlock(mc.player.openContainer, requiredStack, ignoreNbt);
+//
+//                    if (slotWithItem == -1 ) {
+//                        continue;
+//                    }
 
                     furthestDist = dist;
                     furthestTrace = trace;
@@ -459,6 +469,8 @@ public class EasyPlaceUtils
         IBlockState stateSchematic = schematicWorld.getBlockState(targetBlockPos);
         IBlockState stateClient = mc.world.getBlockState(targetBlockPos).getActualState(mc.world, targetBlockPos);
         ItemStack requiredStack = MaterialCache.getInstance().getRequiredBuildItemForState(stateSchematic);
+
+//        System.out.println(schematicWorld.getBlockState(targetPosition.getBlockPos()));
 
         // The block is correct already, or it was recently placed, or some of the checks failed
         if (stateSchematic == stateClient || requiredStack.isEmpty() ||
