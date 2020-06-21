@@ -20,6 +20,8 @@ import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemHoe;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.CompressedStreamTools;
 import net.minecraft.nbt.NBTTagCompound;
@@ -220,7 +222,7 @@ public class MaterialCache
         }
         else if (block == Blocks.GRASS_PATH)
         {
-            return new ItemStack(Blocks.DIRT);
+            return new ItemStack(Blocks.GRASS);
         }
         else if (block == Blocks.BROWN_MUSHROOM_BLOCK)
         {
