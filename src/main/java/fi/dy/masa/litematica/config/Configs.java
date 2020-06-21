@@ -38,6 +38,7 @@ public class Configs implements IConfigHandler
         public static final ConfigBoolean       EASY_PLACE_MODE         = new ConfigBoolean(    "easyPlaceMode", false, "When enabled, then simply trying to use an item/place a block\non schematic blocks will place that block in that position");
         public static final ConfigBoolean       EASY_PLACE_HOLD_ENABLED = new ConfigBoolean(    "easyPlaceHoldEnabled", false, "When enabled, then simply holding down the use key\nand looking at different schematic blocks will place them");
         public static final ConfigBoolean       EASY_PLACE_DEEP_ENABLED = new ConfigBoolean(    "easyPlaceDeepEnabled", false, "When enabled, the Easy Place Mode will attempt to place further away blocks first.");
+        public static final ConfigBoolean       EASY_PLACE_TOOL_ACTIONS = new ConfigBoolean(    "easyPlaceToolActions", false, "When enabled, the Easy Place Mode will attempt to use tool right click functions to correct block states.");
         public static final ConfigBoolean       EXECUTE_REQUIRE_TOOL    = new ConfigBoolean(    "executeRequireHoldingTool", true, "Require holding an enabled tool item\nfor the executeOperation hotkey to work");
         public static final ConfigBoolean       FIX_RAIL_ROTATION       = new ConfigBoolean(    "fixRailRotation", true, "If true, then a fix is applied for the vanilla bug in rails,\nwhere the 180 degree rotations of straight north-south and\neast-west rails rotate 90 degrees counterclockwise instead >_>");
         public static final ConfigBoolean       GENERATE_LOWERCASE_NAMES = new ConfigBoolean(   "generateLowercaseNames", true, "If enabled, then by default the suggested schematic names\nwill be lowercase and using underscores instead of spaces");
@@ -71,6 +72,7 @@ public class Configs implements IConfigHandler
                 EASY_PLACE_MODE,
                 EASY_PLACE_HOLD_ENABLED,
                 EASY_PLACE_DEEP_ENABLED,
+                EASY_PLACE_TOOL_ACTIONS,
                 EXECUTE_REQUIRE_TOOL,
                 FIX_RAIL_ROTATION,
                 GENERATE_LOWERCASE_NAMES,

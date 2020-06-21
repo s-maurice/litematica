@@ -9,14 +9,18 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockChest;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.ClickType;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.InventoryLargeChest;
+import net.minecraft.inventory.Slot;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemTool;
+import net.minecraft.network.play.client.CPacketHeldItemChange;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityLockableLoot;
 import net.minecraft.util.EnumHand;
@@ -296,6 +300,40 @@ public class InventoryUtils
         }
 
         return hand;
+    }
+
+    @Nullable
+    public static EnumHand doPickTool(Class<? extends Item> requiredTool) {
+        // TODO creative mode handling
+
+        Minecraft mc = Minecraft.getMinecraft();
+        EntityPlayer player = mc.player;
+
+        ItemStack bestStack = null;
+        int bestDamage = -1;
+
+        for (Slot slot : player.inventoryContainer.inventorySlots) {
+            // Don't consider armor and crafting slots
+            if (slot.slotNumber <= 8 || slot.getHasStack() == false) {
+                continue;
+            }
+
+            ItemStack stack = slot.getStack();
+            int stackItemDamage = stack.getItemDamage();
+            if (requiredTool.isInstance(stack.getItem()) &&
+                stackItemDamage >= bestDamage) {
+
+                bestStack = stack;
+                bestDamage = stackItemDamage;
+
+            }
+        }
+
+        if (bestStack != null) {
+            return doPickBlockForStack(bestStack, mc);
+        }
+
+        return null;
     }
 
     private static int getEmptyPickBlockableHotbarSlot(InventoryPlayer inventory)

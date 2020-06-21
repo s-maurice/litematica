@@ -12,14 +12,14 @@ import net.minecraft.block.BlockRedstoneRepeater;
 import net.minecraft.block.BlockSlab;
 import net.minecraft.block.BlockStairs;
 import net.minecraft.block.BlockTrapDoor;
-import net.minecraft.block.material.Material;
 import net.minecraft.block.properties.IProperty;
 import net.minecraft.block.properties.PropertyDirection;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.ItemStack;
+import net.minecraft.init.Blocks;
+import net.minecraft.item.*;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
@@ -385,6 +385,12 @@ public class EasyPlaceUtils
         {
             if (traceWrapper != null && traceWrapper.getHitType() == RayTraceWrapper.HitType.VANILLA)
             {
+                if (Configs.Generic.EASY_PLACE_TOOL_ACTIONS.getBooleanValue())
+                {
+                    EnumActionResult toolResult = doEasyPlaceUseTool(mc, traceWrapper.getRayTraceResult());
+                    if (toolResult != EnumActionResult.PASS) { return toolResult; }  // on pass, continue
+                }
+
                 return placementRestrictionInEffect(mc) ? EnumActionResult.FAIL : EnumActionResult.PASS;
             }
 
@@ -408,8 +414,15 @@ public class EasyPlaceUtils
         RayTraceResult traceVanilla = fi.dy.masa.malilib.util.RayTraceUtils.getRayTraceFromEntity(mc.world, entity, RayTraceFluidHandling.NONE, false, reach);
         double closestVanilla = traceVanilla.typeOfHit == RayTraceResult.Type.MISS ? reach * reach : traceVanilla.hitVec.squareDistanceTo(eyesPos); // squared reach
 
-        // tbh rayTraceSchematicWorldBlocksToList should be renamed or not take world arg
         World schematicWorld = SchematicWorldHandler.getSchematicWorld();
+
+        // traceVanilla Block already placed, but not correct
+        if (Configs.Generic.EASY_PLACE_TOOL_ACTIONS.getBooleanValue()) {
+            EnumActionResult toolResult = doEasyPlaceUseTool(mc, traceVanilla);
+            if (toolResult != EnumActionResult.PASS) { return toolResult; }  // on pass, continue
+        }
+
+        // tbh rayTraceSchematicWorldBlocksToList should be renamed or not take world arg
         List<RayTraceResult> list = RayTraceUtils.rayTraceSchematicWorldBlocksToList(schematicWorld, eyesPos, lookEndPos, 24);
 
         // get furthest schematic block, but not further than vanilla block, same as in getPickBlockLastTrace
@@ -468,6 +481,8 @@ public class EasyPlaceUtils
         World schematicWorld = SchematicWorldHandler.getSchematicWorld();
         IBlockState stateSchematic = schematicWorld.getBlockState(targetBlockPos);
         IBlockState stateClient = mc.world.getBlockState(targetBlockPos).getActualState(mc.world, targetBlockPos);
+
+        // creative override to directly place blocks? (grass path, farmland, etc.)
         ItemStack requiredStack = MaterialCache.getInstance().getRequiredBuildItemForState(stateSchematic);
 
 //        System.out.println(schematicWorld.getBlockState(targetPosition.getBlockPos()));
@@ -545,6 +560,51 @@ public class EasyPlaceUtils
         }
 
         return EnumActionResult.SUCCESS;
+    }
+
+    private static Class<? extends Item> getToolTransform(Block stateFrom, Block stateTo) {
+        // ItemHoe doesn't extend ToolItem for some reason
+        // probs should combined with material cache in some way
+
+        Class<? extends Item> toolRequired = null;
+        if (stateFrom == Blocks.DIRT && stateTo == Blocks.FARMLAND) { toolRequired = ItemHoe.class; }
+        else if (stateFrom == Blocks.GRASS && stateTo == Blocks.GRASS_PATH) { toolRequired = ItemSpade.class; }
+
+        return toolRequired;
+    }
+
+    private static EnumActionResult doEasyPlaceUseTool(Minecraft mc, RayTraceResult trace) {
+        // for blocks that require tool interaction (farmland, path block, stripped log (1.13+))
+
+        World schematicWorld = SchematicWorldHandler.getSchematicWorld();
+        BlockPos targetBlockPos = trace.getBlockPos();
+
+        Block blockClient = mc.world.getBlockState(targetBlockPos).getActualState(mc.world, targetBlockPos).getBlock();
+        Block blockSchematic = schematicWorld.getBlockState(targetBlockPos).getBlock();
+        if (blockClient == blockSchematic || blockClient == Blocks.AIR) { return EnumActionResult.PASS; }
+
+        Class<? extends Item> toolRequired = getToolTransform(blockClient, blockSchematic);
+        if (toolRequired == null) { return EnumActionResult.PASS; }  // checks if tool transform is needed
+
+        RayTraceWrapper rayTraceWrapper = new RayTraceWrapper(RayTraceWrapper.HitType.SCHEMATIC_BLOCK, trace);
+        HitPosition targetPosition = getTargetPosition(rayTraceWrapper, mc);
+
+        EnumHand hand = InventoryUtils.doPickTool(toolRequired);
+        if (hand == null) { return EnumActionResult.FAIL; }
+
+        BlockPos clickPos = targetPosition.getBlockPos();
+        Vec3d hitPos = targetPosition.getExactPos();
+        EnumFacing side = targetPosition.getSide();
+
+        if (mc.playerController.processRightClickBlock(mc.player, mc.world, clickPos, side, hitPos, hand) == EnumActionResult.SUCCESS) {
+
+            mc.player.swingArm(hand);
+            mc.entityRenderer.itemRenderer.resetEquippedProgress(hand);
+
+            return EnumActionResult.SUCCESS;
+        }
+
+        return EnumActionResult.FAIL;
     }
 
     private static boolean clientBlockIsSameMaterialSingleSlab(IBlockState stateSchematic, IBlockState stateClient)
