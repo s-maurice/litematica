@@ -429,7 +429,7 @@ public class RayTraceUtils
     }
 
     @Nullable
-    public static BlockPos getFurthestSchematicWorldTrace(World worldClient, Entity entity, double maxRange)
+    public static BlockPos getFurthestSchematicWorldTrace(World worldClient, Entity entity, double maxRange, boolean requireVanilla)
     {
         Vec3d eyesPos = entity.getCameraPosVec(1f);
         Vec3d rangedLookRot = entity.getRotationVec(1f).multiply(maxRange);
@@ -437,7 +437,7 @@ public class RayTraceUtils
 
         HitResult traceVanilla = getRayTraceFromEntity(worldClient, entity, false, maxRange);
 
-        if (traceVanilla.getType() != HitResult.Type.BLOCK)
+        if (traceVanilla.getType() != HitResult.Type.BLOCK && requireVanilla)
         {
             return null;
         }

@@ -24,6 +24,7 @@ import net.minecraft.block.enums.SlabType;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientChunkManager;
 import net.minecraft.client.world.ClientWorld;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemPlacementContext;
@@ -41,6 +42,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.Vec3i;
+import net.minecraft.world.RayTraceContext;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkStatus;
@@ -372,7 +374,7 @@ public class WorldUtils
         }
         else
         {
-            pos = RayTraceUtils.getFurthestSchematicWorldTrace(mc.world, mc.player, 6);
+            pos = RayTraceUtils.getFurthestSchematicWorldTrace(mc.world, mc.player, 6, false);
         }
 
         if (pos != null)
@@ -450,7 +452,17 @@ public class WorldUtils
 
     private static ActionResult doEasyPlaceAction(MinecraftClient mc)
     {
-        RayTraceWrapper traceWrapper = RayTraceUtils.getGenericTrace(mc.world, mc.player, 6, true);
+
+        RayTraceWrapper traceWrapper;
+
+        if (Configs.Generic.DEEP_EASY_PLACE_MODE.getBooleanValue())
+        {
+            traceWrapper = getDeepEasyPlace(mc);
+        }
+        else
+        {
+            traceWrapper = RayTraceUtils.getGenericTrace(mc.world, mc.player, 6, true);
+        }
 
         if (traceWrapper == null)
         {
@@ -488,7 +500,8 @@ public class WorldUtils
                 }
 
                 // Abort if the required item was not able to be pick-block'd
-                if (doSchematicWorldPickBlock(true, mc) == false)
+                boolean pickClosest = !Configs.Generic.DEEP_EASY_PLACE_MODE.getBooleanValue();
+                if (doSchematicWorldPickBlock(pickClosest, mc) == false)
                 {
                     return ActionResult.FAIL;
                 }
@@ -562,6 +575,57 @@ public class WorldUtils
         }
 
         return ActionResult.PASS;
+    }
+
+    private static RayTraceWrapper getDeepEasyPlace(MinecraftClient mc) {
+        // two possible deep easy place behaviours, one where it only tries the furthest block
+        // one where it tries the next closest block if the furthest fails
+
+        double reach = Math.max(6, mc.interactionManager.getReachDistance());
+        Entity entity = fi.dy.masa.malilib.util.EntityUtils.getCameraEntity();
+
+        Vec3d eyesPos = entity.getCameraPosVec(1f);
+        Vec3d rangedLookRot = entity.getRotationVec(1f).multiply(reach);
+        Vec3d lookEndPos = eyesPos.add(rangedLookRot);
+
+        HitResult traceVanilla = RayTraceUtils.getRayTraceFromEntity(mc.world, entity, false, reach);
+
+//        if (traceVanilla.getType() != HitResult.Type.BLOCK)
+//        {
+//            return null;
+//        }
+
+        final double closestVanilla = traceVanilla.getPos().squaredDistanceTo(eyesPos);
+
+        BlockHitResult vanillaBlockHit = (BlockHitResult) traceVanilla;
+//        Direction side = vanillaBlockHit.getSide();
+        BlockPos closestVanillaPos = vanillaBlockHit.getBlockPos();
+        World worldSchematic = SchematicWorldHandler.getSchematicWorld();
+        List<BlockHitResult> list = RayTraceUtils.rayTraceBlocksToList(worldSchematic, eyesPos, lookEndPos, RayTraceContext.FluidHandling.NONE, false, false, true, 200);
+        BlockHitResult furthestTrace = null;
+        double furthestDist = -1D;
+
+        if (list.isEmpty() == false)
+        {
+            for (BlockHitResult trace : list)
+            {
+                double dist = trace.getPos().squaredDistanceTo(eyesPos);
+
+                if ((furthestDist < 0 || dist > furthestDist) && (dist < closestVanilla || closestVanilla < 0) &&
+                        trace.getBlockPos().equals(closestVanillaPos) == false)
+                {
+                    furthestDist = dist;
+                    furthestTrace = trace;
+                }
+
+                if (closestVanilla >= 0 && dist > closestVanilla)
+                {
+                    break;
+                }
+            }
+        }
+
+        return furthestTrace == null ? null : new RayTraceWrapper(RayTraceWrapper.HitType.SCHEMATIC_BLOCK , furthestTrace);
     }
 
     private static boolean easyPlaceBlockChecksCancel(BlockState stateSchematic, BlockState stateClient,
